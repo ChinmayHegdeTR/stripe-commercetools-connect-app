@@ -199,7 +199,7 @@ export class StripePaymentService extends AbstractPaymentService {
           metadata: {
             cart_id: ctCart.id,
             ct_project_key: getConfig().projectKey,
-            email: ctCart.customerEmail,
+            email: ctCart.customerEmail || '',
             billing_address: JSON.stringify(ctCart.billingAddress),
           },
           shipping: shippingAddress,
