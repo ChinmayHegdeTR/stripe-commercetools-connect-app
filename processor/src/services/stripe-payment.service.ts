@@ -181,6 +181,7 @@ export class StripePaymentService extends AbstractPaymentService {
     const amountPlanned = await this.ctCartService.getPaymentAmount({ cart: ctCart });
     const customer = await this.getCtCustomer(ctCart.customerId!);
     const shippingAddress = this.getStripeAddress(ctCart, customer);
+    const billingAddress = this.getStripeBillingAddress(ctCart, customer);
     const captureMethodConfig = getConfig().stripeCaptureMethod;
     const merchantReturnUrl = getMerchantReturnUrlFromContext() || getConfig().merchantReturnUrl;
     let paymentIntent!: Stripe.PaymentIntent;
@@ -199,8 +200,8 @@ export class StripePaymentService extends AbstractPaymentService {
           metadata: {
             cart_id: ctCart.id,
             ct_project_key: getConfig().projectKey,
-            email: ctCart.customerEmail || '',
-            billing_address: JSON.stringify(ctCart.billingAddress),
+            email: ctCart.customerEmail || customer.email || '',
+            billing: billingAddress ? JSON.stringify(billingAddress) : '',
           },
           shipping: shippingAddress,
         },
@@ -510,6 +511,26 @@ export class StripePaymentService extends AbstractPaymentService {
         postal_code: shipping?.postalCode,
         state: shipping?.state,
         country: shipping?.country,
+      },
+    };
+  }
+  public getStripeBillingAddress(cart: Cart, customer: Customer) {
+    const billing = cart.billingAddress || customer.addresses[0];
+
+    if (!billing) {
+      return undefined;
+    }
+
+    return {
+      name: `${billing?.firstName} ${billing?.lastName}`.trim(),
+      phone: billing?.phone || billing?.mobile,
+      address: {
+        line1: `${billing?.streetNumber} ${billing?.streetName}`.trim(),
+        line2: billing?.additionalStreetInfo,
+        city: billing?.city,
+        postal_code: billing?.postalCode,
+        state: billing?.state,
+        country: billing?.country,
       },
     };
   }
