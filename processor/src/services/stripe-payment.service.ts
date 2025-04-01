@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { healthCheckCommercetoolsPermissions, statusHandler } from '@commercetools/connect-payments-sdk';
+import { Customer } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/customer';
 import {
   CancelPaymentRequest,
   CapturePaymentRequest,
@@ -178,6 +179,8 @@ export class StripePaymentService extends AbstractPaymentService {
     });
 
     const amountPlanned = await this.ctCartService.getPaymentAmount({ cart: ctCart });
+    const customer = await this.getCtCustomer(ctCart.customerId!);
+    const shippingAddress = this.getStripeAddress(ctCart, customer);
     const captureMethodConfig = getConfig().stripeCaptureMethod;
     const merchantReturnUrl = getMerchantReturnUrlFromContext() || getConfig().merchantReturnUrl;
     let paymentIntent!: Stripe.PaymentIntent;
@@ -196,7 +199,10 @@ export class StripePaymentService extends AbstractPaymentService {
           metadata: {
             cart_id: ctCart.id,
             ct_project_key: getConfig().projectKey,
+            email: ctCart.customerEmail,
+            billing_address: JSON.stringify(ctCart.billingAddress),
           },
+          shipping: shippingAddress,
         },
         {
           idempotencyKey,
@@ -476,5 +482,35 @@ export class StripePaymentService extends AbstractPaymentService {
       })
       .execute();
     return cart.body;
+  }
+
+  public async getCtCustomer(ctCustomerId: string): Promise<Customer> {
+    const response = await paymentSDK.ctAPI.client.customers().withId({ ID: ctCustomerId }).get().execute();
+    if (!response.body) {
+      log.error('Customer not found', { ctCustomerId });
+      throw `Customer with ID ${ctCustomerId} not found`;
+    }
+    return response.body;
+  }
+
+  public getStripeAddress(cart: Cart, customer: Customer) {
+    const shipping = cart.shippingAddress || customer.addresses[0];
+
+    if (!shipping) {
+      return undefined;
+    }
+
+    return {
+      name: `${shipping?.firstName} ${shipping?.lastName}`.trim(),
+      phone: shipping?.phone || shipping?.mobile,
+      address: {
+        line1: `${shipping?.streetNumber} ${shipping?.streetName}`.trim(),
+        line2: shipping?.additionalStreetInfo,
+        city: shipping?.city,
+        postal_code: shipping?.postalCode,
+        state: shipping?.state,
+        country: shipping?.country,
+      },
+    };
   }
 }
