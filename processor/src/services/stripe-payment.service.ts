@@ -179,7 +179,7 @@ export class StripePaymentService extends AbstractPaymentService {
     });
 
     const amountPlanned = await this.ctCartService.getPaymentAmount({ cart: ctCart });
-    const customer = await this.getCtCustomer(ctCart.customerId!);
+    const customer = await this.getCtCustomer(ctCart.customerId || ctCart.anonymousId || '');
     const shippingAddress = this.getStripeAddress(ctCart, customer);
     const billingAddress = this.getStripeBillingAddress(ctCart, customer);
     const stripeCustomerId = await this.getStripeCustomerId(ctCart, customer);
@@ -217,6 +217,10 @@ export class StripePaymentService extends AbstractPaymentService {
     log.info(`Stripe PaymentIntent created.`, {
       ctCartId: ctCart.id,
       stripePaymentIntentId: paymentIntent.id,
+    });
+
+    log.info(`Stripe PaymentIntent Object.`, {
+      paymentIntent: JSON.stringify(paymentIntent),
     });
 
     const ctPayment = await this.ctPaymentService.createPayment({
